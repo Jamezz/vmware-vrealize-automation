@@ -13,7 +13,6 @@ import com.google.gson.stream.JsonReader;
 import net.sf.json.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
 
-
 /**
  * Created by kthieler on 2/24/16.
  */
@@ -35,28 +34,25 @@ public class Deployment {
     private String cataologID;
     private String subtenantRef;
 
-    private String jsonString = "{\"@type\":\"ResourceActionRequest\", \"resourceRef\":{\"id\":\"\"}, \"resourceActionRef\"\n" +
-            ":{\"id\":\"\"}, \"organization\":{\"tenantRef\":\"\", \"tenantLabel\"\n" +
-            ":\"\", \"subtenantRef\":\"\", \"subtenantLabel\":\"\"\n" +
-            "}, \"state\":\"SUBMITTED\", \"requestNumber\":0, \"requestData\":{\"entries\":[]}}";
+    private String jsonString = "{\"@type\":\"ResourceActionRequest\", \"resourceRef\":{\"id\":\"\"}, \"resourceActionRef\"\n"
+            + ":{\"id\":\"\"}, \"organization\":{\"tenantRef\":\"\", \"tenantLabel\"\n"
+            + ":\"\", \"subtenantRef\":\"\", \"subtenantLabel\":\"\"\n"
+            + "}, \"state\":\"SUBMITTED\", \"requestNumber\":0, \"requestData\":{\"entries\":[]}}";
 
     private Set<String> componentSet = new HashSet<String>();
 
     private List<List<String>> machineList = new ArrayList<List<String>>();
     private ArrayList<String> machineDataList = new ArrayList<String>();
 
-
-
     private List<List<String>> loadBalancerList = new ArrayList<List<String>>();
     private ArrayList<String> loadBalancerDataList = new ArrayList<String>();
-
 
     public Deployment(PrintStream logger, PluginParam params) throws IOException {
 
         this.params = params;
         this.logger = logger;
 
-        this.request  = new Request(logger, params);
+        this.request = new Request(logger, params);
 
     }
 
@@ -65,8 +61,7 @@ public class Deployment {
         this.dParams = params;
         this.logger = logger;
 
-        this.request  = new Request(logger, params);
-
+        this.request = new Request(logger, params);
 
     }
 
@@ -74,18 +69,18 @@ public class Deployment {
 
         boolean rcode = false;
 
-        if ( params.getRequestTemplate()) {
+        if (params.getRequestTemplate()) {
 
             logger.println("Requesting Blueprint Template");
             this.bluePrintTemplate = this.request.GetBluePrintTemplate();
             JsonParser parser = new JsonParser();
 
-            for ( RequestParam option : params.getRequestParams()){
-                if ( option.getJson() == null ){
+            for (RequestParam option : params.getRequestParams()) {
+                if (option.getJson() == null) {
 
                     logger.println("Request Parameter is null. skipping to next parameter");
 
-                }else {
+                } else {
                     logger.println("Request Parameter : " + option.getJson());
 
                     this.bluePrintTemplate = merge(this.bluePrintTemplate.getAsJsonObject(),
@@ -94,23 +89,23 @@ public class Deployment {
             }
             request.ProvisionBluePrint(this.bluePrintTemplate);
 
-        }else{
+        } else {
 
             JsonObject bpDetails = request.fetchBluePrint();
 
             JsonArray contentArray = bpDetails.getAsJsonArray("content");
 
-            for (JsonElement content : contentArray ){
+            for (JsonElement content : contentArray) {
 
-                if( content.getAsJsonObject().get("name").getAsString().equalsIgnoreCase(params.getBluePrintName())){
+                if (content.getAsJsonObject().get("name").getAsString().equalsIgnoreCase(params.getBluePrintName())) {
 
-                    this.cataologID= content.getAsJsonObject().get("catalogItemId").getAsString();
+                    this.cataologID = content.getAsJsonObject().get("catalogItemId").getAsString();
 
                     JsonArray orgArray = content.getAsJsonObject().getAsJsonArray("entitledOrganizations");
 
-                    for ( JsonElement org : orgArray ){
-                        if( org.getAsJsonObject().get("tenantLabel").getAsString().equalsIgnoreCase(params.getTenant())){
-                            this.subtenantRef= org.getAsJsonObject().get("subtenantRef").getAsString();
+                    for (JsonElement org : orgArray) {
+                        if (org.getAsJsonObject().get("tenantLabel").getAsString().equalsIgnoreCase(params.getTenant())) {
+                            this.subtenantRef = org.getAsJsonObject().get("subtenantRef").getAsString();
                             break;
                         }
 
@@ -120,16 +115,14 @@ public class Deployment {
                 }
             }
 
-            if(this.cataologID == null ){
+            if (this.cataologID == null) {
                 throw new IOException("Did not find the catalogID value from the provided blueprint : "
-                        +params.getBluePrintName()+"\nPlease validate blueprint name in vRA");
+                        + params.getBluePrintName() + "\nPlease validate blueprint name in vRA");
             }
 
-
-
-            if(this.subtenantRef == null ){
+            if (this.subtenantRef == null) {
                 throw new IOException("Did not find the subtenantRef value from the provided tenant name : "
-                                        +params.getTenant()+"\nPlease validate tenant name in vRA");
+                        + params.getTenant() + "\nPlease validate tenant name in vRA");
             }
 
             this.bluePrintTemplate = requestCreateJSON();
@@ -137,7 +130,6 @@ public class Deployment {
             System.out.println("Requesting Blueprint with JSON body : " + json);
             request.PostRequestJson(this.bluePrintTemplate.toString());
         }
-
 
         if (this.params.isWaitExec()) {
             while (!request.IsRequestComplete()) {
@@ -164,64 +156,61 @@ public class Deployment {
 
     }
 
-    private JsonObject requestCreateJSON(){
+    private JsonObject requestCreateJSON() {
 
         // create the albums object
         JsonObject requestJson = new JsonObject();
         // add a property calle title to the albums object
-            requestJson.addProperty("@type","CatalogItemRequest");
+        requestJson.addProperty("@type", "CatalogItemRequest");
 
-            JsonObject catalogItemRef = new JsonObject();
-                catalogItemRef.addProperty("id",this.cataologID);
-            requestJson.add("catalogItemRef", catalogItemRef);
+        JsonObject catalogItemRef = new JsonObject();
+        catalogItemRef.addProperty("id", this.cataologID);
+        requestJson.add("catalogItemRef", catalogItemRef);
 
-            JsonObject organization = new JsonObject();
-                organization.addProperty("tenantRef",this.params.getTenant());
-                organization.addProperty("subtenantRef",this.subtenantRef);
-            requestJson.add("organization", organization);
+        JsonObject organization = new JsonObject();
+        organization.addProperty("tenantRef", this.params.getTenant());
+        organization.addProperty("subtenantRef", this.subtenantRef);
+        requestJson.add("organization", organization);
 
-            requestJson.addProperty("requestedFor",this.params.getUserName());
-            requestJson.addProperty("state","SUBMITTED");
-            requestJson.addProperty("requestNumber", 0);
+        requestJson.addProperty("requestedFor", this.params.getUserName());
+        requestJson.addProperty("state", "SUBMITTED");
+        requestJson.addProperty("requestNumber", 0);
 
+        JsonObject requestData = new JsonObject();
 
-                JsonObject requestData = new JsonObject();
+        JsonArray entriesArray = new JsonArray();
+        JsonObject entries = new JsonObject();
 
+        entries.addProperty("key", "requestedFor");
 
-                    JsonArray entriesArray = new JsonArray();
-                    JsonObject entries = new JsonObject();
+        JsonObject value = new JsonObject();
+        value.addProperty("type", "string");
+        value.addProperty("value", this.params.getUserName());
 
-                        entries.addProperty("key", "requestedFor");
+        entries.add("value", value);
 
-                        JsonObject value = new JsonObject();
-                            value.addProperty("type","string");
-                            value.addProperty("value",this.params.getUserName());
+        entriesArray.add(entries);
 
-                        entries.add("value", value);
+        for (RequestParam option : params.getRequestParams()) {
 
-                    entriesArray.add(entries);
+            if (option.getJson() == null) {
 
-                    for ( RequestParam option : params.getRequestParams()) {
+                logger.println("Request Parameter is null. skipping to next parameter");
 
-                        if ( option.getJson() == null ){
+            } else {
+                logger.println("Request Parameter : " + option.getJson());
+                JsonElement response = new JsonParser().parse(option.getJson()).getAsJsonObject();
+                entriesArray.add(response);
+            }
 
-                            logger.println("Request Parameter is null. skipping to next parameter");
+        }
 
-                        }else {
-                            logger.println("Request Parameter : " + option.getJson());
-                            JsonElement response = new JsonParser().parse(option.getJson()).getAsJsonObject();
-                            entriesArray.add(response);
-                        }
-
-                    }
-
-                requestData.add("entries", entriesArray);
-            requestJson.add("requestData", requestData);
+        requestData.add("entries", entriesArray);
+        requestJson.add("requestData", requestData);
 
         return requestJson;
 
     }
-
 
     private void getMachineList() {
 
@@ -232,7 +221,7 @@ public class Deployment {
             if (content.getAsJsonObject().get("resourceType").getAsString().contains("Infrastructure.Virtual")) {
 
                 JsonObject jsonData = content.getAsJsonObject().getAsJsonObject("data");
-                JsonArray  networkArray = jsonData.getAsJsonArray("NETWORK_LIST");
+                JsonArray networkArray = jsonData.getAsJsonArray("NETWORK_LIST");
 
                 componentSet.add(jsonData.getAsJsonObject().get("Component").getAsString());
 
@@ -243,7 +232,9 @@ public class Deployment {
                     machineDataList.add(jsonData.getAsJsonObject().get("Component").getAsString());
                     machineDataList.add(content.getAsJsonObject().get("name").getAsString());
                     machineDataList.add(jsonNetworkData.getAsJsonObject().get("NETWORK_NAME").getAsString());
-                    machineDataList.add(jsonNetworkData.getAsJsonObject().get("NETWORK_ADDRESS").getAsString());
+                    
+                    //JENKINS-34111
+                    machineDataList.addAll(getIPAddressList(content));
 
                     machineList.add(machineDataList);
 
@@ -270,22 +261,21 @@ public class Deployment {
 
                 loadBalancerList.add(loadBalancerDataList);
 
-                }
-
             }
+
+        }
 
     }
 
-    public Map <String, String> getMachineHashMap() throws IOException {
+    public Map<String, String> getMachineHashMap() throws IOException {
 
         Map machineMap = null;
 
         getMachineList();
 
-
-        for( List machine : this.machineList ){
+        for (List machine : this.machineList) {
             //creat map named grup__machine_name__network_name :  network address
-            for ( Object data : machine ){
+            for (Object data : machine) {
                 System.out.println(data.toString());
             }
 
@@ -299,15 +289,14 @@ public class Deployment {
         HashMap<String, String> map = new HashMap<String, String>();
 
         String deploymentName = getDeploymentName();
-        String prefixDep = "VRADEP_"+count+"_";
-        map.put( prefixDep+"NAME", deploymentName);
-        map.put( prefixDep+"TENANT", params.getTenant());
-
+        String prefixDep = "VRADEP_" + count + "_";
+        map.put(prefixDep + "NAME", deploymentName);
+        map.put(prefixDep + "TENANT", params.getTenant());
 
         getMachineList();
 
-        int componentCounter=1;
-        for ( String component : componentSet ) {
+        int componentCounter = 1;
+        for (String component : componentSet) {
 
             String componentPrefix = prefixDep + "COMPONENT" + componentCounter;
             String componentMachinePrefix = "";
@@ -334,7 +323,6 @@ public class Deployment {
                         componentMachinePrefix = componentPrefix + "_MACHINE" + machineCounter;
 
                         //VRADEP_PB_1_COMPONENT#_MACHINE#_NAME=
-
                         map.put(componentMachinePrefix + "_NAME", machine.get(2).toString().toUpperCase());
                         networkSet.add(machine.get(3).toString());
                         break;
@@ -352,11 +340,9 @@ public class Deployment {
                             String networkMachinePrefix = componentMachinePrefix + "_NETWORK" + networkCounter;
 
                             //VRADEP_PB_1_COMPONENT#_MACHINE#_NETWORK#_NAME=
-
                             map.put(networkMachinePrefix + "_NAME", machine.get(3).toString().toUpperCase());
 
                             //VRADEP_PB_1_COMPONENT#_MACHINE#_NETWORK#_IP#=
-
                             map.put(networkMachinePrefix + "_IP" + ipCounter, machine.get(4).toString().toUpperCase());
                             ipCounter++;
                             networkCounter++;
@@ -392,29 +378,26 @@ public class Deployment {
             }
 
         }
-        */
-
+         */
         getLoadBalancerList();
 
-        for( List loadbalancer : this.loadBalancerList ){
+        for (List loadbalancer : this.loadBalancerList) {
 
             int lbCounter = 1;
-            for ( Object data : loadbalancer ){
-                String lbPrefix = prefixDep+"LB"+lbCounter+"_";
+            for (Object data : loadbalancer) {
+                String lbPrefix = prefixDep + "LB" + lbCounter + "_";
                 //VRADEP_PB_1_LBNAME
-                map.put(lbPrefix + "NAME",loadbalancer.get(1).toString().toUpperCase());
-                map.put(lbPrefix + "SERVICES",loadbalancer.get(2).toString());
+                map.put(lbPrefix + "NAME", loadbalancer.get(1).toString().toUpperCase());
+                map.put(lbPrefix + "SERVICES", loadbalancer.get(2).toString());
 
             }
 
         }
 
-
-
         return map;
     }
 
-    public String getDeploymentName(){
+    public String getDeploymentName() {
 
         JsonArray contentArray = this.deploymentResources.getAsJsonArray("content");
         for (JsonElement content : contentArray) {
@@ -422,7 +405,7 @@ public class Deployment {
             if (content.getAsJsonObject().get("resourceType").getAsString().equals("composition.resource.type.deployment")) {
 
                 this.deploymentName = content.getAsJsonObject().get("name").getAsString();
-                System.out.println("Name :" + this.deploymentName );
+                System.out.println("Name :" + this.deploymentName);
 
             }
         }
@@ -430,14 +413,13 @@ public class Deployment {
         return depName;
     }
 
-    public void DeploymentResources() throws IOException{
+    public void DeploymentResources() throws IOException {
 
-            this.deploymentResources  = request.GetRequestResourceView();
+        this.deploymentResources = request.GetRequestResourceView();
 
     }
 
-
-    public void getParentResourceID() throws IOException{
+    public void getParentResourceID() throws IOException {
 
         JsonArray contentArray = this.deploymentResources.getAsJsonArray("content");
         for (JsonElement content : contentArray) {
@@ -449,18 +431,16 @@ public class Deployment {
         }
     }
 
-
-
-    public void getParentResourceID(String name) throws IOException{
+    public void getParentResourceID(String name) throws IOException {
 
         JsonArray contentArray = this.deploymentResources.getAsJsonArray("content");
 
         for (JsonElement content : contentArray) {
-            System.out.println("Content :" + content.getAsJsonObject().get("name").getAsString() );
+            System.out.println("Content :" + content.getAsJsonObject().get("name").getAsString());
 
             if (content.getAsJsonObject().get("name").getAsString().equals(name)) {
                 this.parentResourceID = content.getAsJsonObject().get("resourceId").getAsString();
-                System.out.println("ParentID :" + this.parentResourceID );
+                System.out.println("ParentID :" + this.parentResourceID);
                 break;
             }
         }
@@ -484,37 +464,63 @@ public class Deployment {
         String actionID = "";
 
         for (JsonElement content : contentArray) {
-                System.out.println(content.getAsJsonObject().get("name").getAsString());
+            System.out.println(content.getAsJsonObject().get("name").getAsString());
             if (content.getAsJsonObject().get("name").getAsString().equals("Destroy")) {
-                 actionID = content.getAsJsonObject().get("id").getAsString();
-                 System.out.println(actionID);
-                 break;
+                actionID = content.getAsJsonObject().get("id").getAsString();
+                System.out.println(actionID);
+                break;
             }
         }
         return actionID;
 
     }
 
-    private void getTenant(){
+    private List<String> getIPAddressList(JsonElement machineElement) {
+        List<String> ipList = new ArrayList<String>();
+        JsonObject jsonData = machineElement.getAsJsonObject().getAsJsonObject("data");
+        JsonArray networkArray = jsonData.getAsJsonArray("NETWORK_LIST");
+        for (JsonElement ele : networkArray) {
+            JsonElement jsonNetworkData = ele.getAsJsonObject().get("data");
+            try {
+                ipList.add(jsonNetworkData.getAsJsonObject().get("NETWORK_ADDRESS").getAsString());
+            } catch (Exception ex) {
+                //NETWORK_LIST contained an entry that did not have NETWORK_ADDRESS in it. So we can look elsewhere to try and get an IP address.
+                //Note: This will probably only work with machines that have a single network interface.
+                JsonElement ip_address = ele.getAsJsonObject().getAsJsonObject("data").get("ip_address");
+                if (ip_address != null)
+                {
+                    ipList.add(ip_address.getAsString());
+                }
+                else
+                {
+                    ipList.add("null");
+                }
+            }
+
+        }
+        return ipList;
+    }
+
+    private void getTenant() {
 
         JsonArray contentArray = this.deploymentResources.getAsJsonArray("content");
 
         for (JsonElement content : contentArray) {
             if (content.getAsJsonObject().get("resourceId").getAsString().equals(this.parentResourceID)) {
                 this.tenantId = content.getAsJsonObject().get("tenantId").getAsString();
-                System.out.println("tenantID :" + this.tenantId );
+                System.out.println("tenantID :" + this.tenantId);
                 break;
             }
         }
     }
 
-    private void getBusinessGroup(){
+    private void getBusinessGroup() {
         JsonArray contentArray = this.deploymentResources.getAsJsonArray("content");
 
         for (JsonElement content : contentArray) {
             if (content.getAsJsonObject().get("resourceId").getAsString().equals(this.parentResourceID)) {
                 this.businessGroupId = content.getAsJsonObject().get("businessGroupId").getAsString();
-                System.out.println("tenantID :" + this.businessGroupId );
+                System.out.println("tenantID :" + this.businessGroupId);
                 break;
             }
         }
@@ -530,8 +536,7 @@ public class Deployment {
             // if field exists and is an embedded object
             if (jsonNode != null && jsonNode.isObject()) {
                 merge(jsonNode, updateNode.get(fieldName));
-            }
-            else {
+            } else {
                 if (mainNode instanceof ObjectNode) {
                     // Overwrite field
                     JsonNode value = updateNode.get(fieldName);
@@ -557,12 +562,11 @@ public class Deployment {
         System.out.println("Original BP request : " + json1);
         System.out.println("JSON to merge : " + json2);
 
-
         JsonNode mainNode = mapper.readTree(json1);
         returnJSON = parser.parse(mainNode.toString()).getAsJsonObject();
         JsonNode updateNode = mapper.readTree(json2);
 
-        returnJSON = parser.parse(merge(mainNode,updateNode).toString()).getAsJsonObject();
+        returnJSON = parser.parse(merge(mainNode, updateNode).toString()).getAsJsonObject();
 
         /*Iterator<String> fieldNames = updateNode.fieldNames();
 
@@ -624,19 +628,18 @@ public class Deployment {
 
         returnJSON = parser.parse(mainNode.toString()).getAsJsonObject();
         System.out.println("Returning with :"+returnJSON);
-        */
+         */
         return returnJSON;
 
     }
 
+    public boolean Destroy(String DeploymentName) throws IOException {
 
-    public boolean Destroy( String DeploymentName ) throws IOException {
-
-        logger.println("Destroying Deployment "+DeploymentName);
+        logger.println("Destroying Deployment " + DeploymentName);
 
         // Get ResrouceView to find parentID from name
         this.deploymentResources = this.request.GetResourceView(DeploymentName);
-        System.out.println("JSON Obj "+this.deploymentResources);
+        System.out.println("JSON Obj " + this.deploymentResources);
 
         this.getParentResourceID(DeploymentName);
         // Get actionID for destroy
@@ -646,7 +649,7 @@ public class Deployment {
 
     public boolean Destroy() throws IOException {
 
-        if( this.parentResourceID == null ) {
+        if (this.parentResourceID == null) {
             System.out.println("Destroying Deployment");
 
             DeploymentResources();
@@ -656,7 +659,7 @@ public class Deployment {
         String actionID = this.getDestroyAction();
         getBusinessGroup();
         getTenant();
-/*
+        /*
         JsonObject json = request.getResourceActionsRequestTemplate(parentResourceID, actionID);
 
         json.addProperty("description", "test");
@@ -666,10 +669,9 @@ public class Deployment {
 
         System.out.println(json);
         request.ResourceActionsRequest(parentResourceID, actionID, json);
-*/
+         */
 
-        System.out.println("JSON Destroy "+ jsonString);
-
+        System.out.println("JSON Destroy " + jsonString);
 
         JsonElement jsonDestroyElement = new JsonParser().parse(jsonString);
         JsonObject jsonDestroyObject = jsonDestroyElement.getAsJsonObject();
@@ -685,11 +687,7 @@ public class Deployment {
         jsonOrganizationAction.addProperty("tenantLabel", this.tenantId);
         jsonOrganizationAction.addProperty("subtenantRef", this.businessGroupId);
 
-
-
-
-
-        System.out.println("JSON Destroy "+jsonDestroyObject.toString());
+        System.out.println("JSON Destroy " + jsonDestroyObject.toString());
 
         request.PostRequest(jsonDestroyObject.toString());
 
